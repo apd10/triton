@@ -58,8 +58,9 @@ class CodeGenerator(ast.NodeVisitor):
                 break
         return stmts and isinstance(stmt, ast.Return)
 
-    def __init__(self, context, prototype, gscope, attributes, constants, kwargs):
+    def __init__(self, context, ast_context, prototype, gscope, attributes, constants, kwargs):
         self.builder = _triton.ir.builder(context)
+        self.ast_context = ast_context
         self.module = _triton.ir.module('', self.builder)
         self.prototype = prototype
         self.gscope = gscope
@@ -605,30 +606,30 @@ class Kernel:
     @staticmethod
     def _to_triton_ir(context, obj):
         type_map = {
-            'I': _triton.ir.type.get_int32,
-            'L': _triton.ir.type.get_int64,
-            'f': _triton.ir.type.get_fp32,
-            'B': _triton.ir.type.get_int1,
-            'f8': _triton.ir.type.get_fp8,
-            'f16': _triton.ir.type.get_fp16,
-            'bf16': _triton.ir.type.get_bf16,
-            'f32': _triton.ir.type.get_fp32,
-            'f64': _triton.ir.type.get_fp64,
-            'i1': _triton.ir.type.get_int1,
-            'i8': _triton.ir.type.get_int8,
-            'i16': _triton.ir.type.get_int16,
-            'i32': _triton.ir.type.get_int32,
-            'i64': _triton.ir.type.get_int64,
-            'u8': _triton.ir.type.get_uint8,
-            'u16': _triton.ir.type.get_uint16,
-            'u32': _triton.ir.type.get_uint32,
-            'u64': _triton.ir.type.get_uint64,
+            'I': _triton.ast.type.get_int32,
+            'L': _triton.ast.type.get_int64,
+            'f': _triton.ast.type.get_fp32,
+            'B': _triton.ast.type.get_int1,
+            'f8': _triton.ast.type.get_fp8,
+            'f16': _triton.ast.type.get_fp16,
+            'bf16': _triton.ast.type.get_bf16,
+            'f32': _triton.ast.type.get_fp32,
+            'f64': _triton.ast.type.get_fp64,
+            'i1': _triton.ast.type.get_int1,
+            'i8': _triton.ast.type.get_int8,
+            'i16': _triton.ast.type.get_int16,
+            'i32': _triton.ast.type.get_int32,
+            'i64': _triton.ast.type.get_int64,
+            'u8': _triton.ast.type.get_uint8,
+            'u16': _triton.ast.type.get_uint16,
+            'u32': _triton.ast.type.get_uint32,
+            'u64': _triton.ast.type.get_uint64,
         }
         # convert torch.Tensor to Triton IR pointers
         if hasattr(obj, 'data_ptr'):
             name = Kernel._type_name(obj)
             elt_ty = type_map[name](context)
-            return _triton.ir.type.make_ptr(elt_ty, 1)
+            return _triton.ast.type.make_ptr(elt_ty, 1)
         # default path returns triton.ir.type directly
         name = Kernel._type_name(obj)
         return type_map[name](context)
@@ -650,16 +651,18 @@ class Kernel:
 
     def _compile(self, *wargs, device, attributes, constants, num_warps, num_stages):
         # create IR module
+        ast_context = _triton.ast.context()
         context = _triton.ir.context()
         # get just-in-time proto-type of kernel
         fn_args = [arg for i, arg in enumerate(wargs) if i not in constants]
-        arg_types = [Kernel._to_triton_ir(context, arg) for arg in fn_args]
-        ret_type = _triton.ir.type.get_void(context)
+        arg_types = [Kernel._to_triton_ir(ast_context, arg) for arg in fn_args]
+        ret_type = _triton.ir.type.get_void(ast_context)
         prototype = _triton.ir.type.make_function(ret_type, arg_types)
         # generate Triton-IR
         # export symbols visible from self.fn into code-generator object
         gscope = self.fn.__globals__
-        generator = CodeGenerator(context, prototype, gscope=gscope, attributes=attributes, constants=constants, kwargs=dict())
+        generator = CodeGenerator(context, ast_context, prototype, gscope=gscope,
+                                  attributes=attributes, constants=constants, kwargs=dict())
         try:
             generator.visit(self.fn.parse())
         except Exception as e:
