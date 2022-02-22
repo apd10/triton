@@ -36,16 +36,16 @@ class CodeGenerator(ast.NodeVisitor):
         else:
             raise ValueError(f'{name} is not defined')
         if isinstance(ret, triton.language.block):
-            handle = self.module.get_value(name)
-            return triton.language.block(handle)
+            ir_handle = self.module.get_value(name)
+            return triton.language.block(ir_handle)
         return ret
 
     def set_value(self, name, value):
         if isinstance(value, _triton.ir.value):
             value = triton.language.block(value)
         if isinstance(value, triton.language.block):
-            self.module.set_value(name, value.handle)
-            self.module.set_type(name, value.handle.type)
+            self.module.set_value(name, value.ir_handle)
+            self.module.set_type(name, value.ir_handle.type)
         self.lscope[name] = value
 
     def is_triton_block(self, value):
@@ -257,9 +257,9 @@ class CodeGenerator(ast.NodeVisitor):
             self.module.seal_block(then_bb)
             if else_bb:
                 self.module.seal_block(else_bb)
-                self.builder.cond_br(cond.handle, then_bb, else_bb)
+                self.builder.cond_br(cond.ir_handle, then_bb, else_bb)
             else:
-                self.builder.cond_br(cond.handle, then_bb, endif_bb)
+                self.builder.cond_br(cond.ir_handle, then_bb, endif_bb)
             self.builder.set_insert_block(then_bb)
             is_terminator = self.visit_compound_statement(node.body)
             # TODO: last statement is a terminator?
@@ -343,7 +343,7 @@ class CodeGenerator(ast.NodeVisitor):
 
         def continue_fn():
             cond = self.visit(node.test)
-            return self.builder.cond_br(cond.handle, loop_bb, next_bb)
+            return self.builder.cond_br(cond.ir_handle, loop_bb, next_bb)
 
         continue_fn()
         self.builder.set_insert_block(loop_bb)
@@ -411,11 +411,11 @@ class CodeGenerator(ast.NodeVisitor):
         def continue_fn():
             self.visit(step_node)
             cond = build_cond()
-            return self.builder.cond_br(cond.handle, loop_bb, next_bb)
+            return self.builder.cond_br(cond.ir_handle, loop_bb, next_bb)
 
         self.visit(init_node)
         cond = build_cond()
-        self.builder.cond_br(cond.handle, loop_bb, next_bb)
+        self.builder.cond_br(cond.ir_handle, loop_bb, next_bb)
         self.builder.set_insert_block(loop_bb)
         self.visit_compound_statement(node.body)
         # TODO: handle case where body breaks control flow

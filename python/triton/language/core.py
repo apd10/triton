@@ -4,7 +4,7 @@ import triton
 from triton._C.libtriton.triton import frontend, ir
 
 
-# convert block/dtype to ir values
+# convert constant/block/dtype to ir value/type
 def _to_ir(x, builder):
     if isinstance(x, bool):
         return builder.get_int1(x)
@@ -24,9 +24,9 @@ def _to_ir(x, builder):
     elif isinstance(x, constexpr):
         return _to_ir(x.value, builder)
     elif isinstance(x, block):
-        return x.handle
-    elif isinstance(x, dtype):
-        return x.handle(builder)
+        return x.ir_handle
+    elif isinstance(x, dtype): # frontend type => ir type
+        return x.get_ir_type(builder)
     return x
 
 
@@ -73,6 +73,9 @@ def builtin(fn):
 
 class dtype:
     def __init__(self, init):
+        '''
+        init: called by ir builder to create ir type
+        '''
         self.init = init
 
     @property
@@ -83,7 +86,7 @@ class dtype:
         assert nom.startswith(prefix)
         return nom[len(prefix):]
 
-    def handle(self, builder):
+    def get_ir_type(self, builder):
         ctx = builder.context
         return self.init(ctx)
 
@@ -105,8 +108,8 @@ class pointer_dtype:
             raise TypeError('element_ty is a {type(element_ty).__name__}.')
         self.element_ty = element_ty
 
-    def handle(self, builder):
-        return ir.type.make_ptr(self.element_ty.handle(builder), 1)
+    def get_ir_type(self, builder):
+        return ir.type.make_ptr(self.element_ty.get_ir_type(builder), 1)
 
     def __str__(self):
         return f'pointer<{self.element_ty}>'
@@ -246,20 +249,19 @@ class block:
             return pointer_dtype(element_ty)
         raise ValueError(f"Unsupported type {ir_type}")
 
-    def __init__(self, handle) -> None:
-        ''' handle: pointer to ir::value '''
-        # IR handle
-        self.handle = handle
+    def __init__(self, ir_handle) -> None:
+        ''' ir_handle: pointer to ir::value '''
+        self.ir_handle = ir_handle
         # Block shape
         self.shape = (1, )
-        if self.handle.type.is_block():
-            self.shape = self.handle.type.shape
+        if self.ir_handle.type.is_block():
+            self.shape = self.ir_handle.type.shape
         self.numel = 1
         for s in self.shape:
             self.numel *= s
         self.numel = constexpr(self.numel)
         # Data-type wrapper
-        self.dtype = block._init_dtype(self.handle.type.scalar)
+        self.dtype = block._init_dtype(self.ir_handle.type.scalar)
         # Shape is a constexpr
         self.shape = [constexpr(s) for s in self.shape]
 
@@ -398,7 +400,7 @@ class block:
 
     @builtin
     def to(self, dtype, bitcast=False, _builder=None):
-        dtype = dtype.handle(_builder)
+        dtype = dtype.get_ir_type(_builder)
         if bitcast:
             return frontend.bitcast(self, dtype, _builder)
         return frontend.cast(self, dtype, _builder)
