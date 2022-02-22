@@ -220,6 +220,9 @@ class constexpr:
 
 
 class block:
+    '''
+    Triton frontend representation for the ir value
+    '''
     @staticmethod
     def _init_dtype(ir_type):
         # primitive type
@@ -243,7 +246,8 @@ class block:
             return pointer_dtype(element_ty)
         raise ValueError(f"Unsupported type {ir_type}")
 
-    def __init__(self, handle):
+    def __init__(self, handle) -> None:
+        ''' handle: pointer to ir::value '''
         # IR handle
         self.handle = handle
         # Block shape

@@ -48,7 +48,7 @@ class CodeGenerator(ast.NodeVisitor):
             self.module.set_type(name, value.handle.type)
         self.lscope[name] = value
 
-    def is_triton_object(self, value):
+    def is_triton_block(self, value):
         return isinstance(value, triton.language.block)
 
     def visit_compound_statement(self, stmts):
@@ -238,9 +238,9 @@ class CodeGenerator(ast.NodeVisitor):
             ast.BitOr: '__or__',
             ast.BitXor: '__xor__',
         }[type(node.op)]
-        if self.is_triton_object(lhs):
+        if self.is_triton_block(lhs):
             return getattr(lhs, fn)(rhs, _builder=self.builder)
-        elif self.is_triton_object(rhs):
+        elif self.is_triton_block(rhs):
             fn = fn[:2] + 'r' + fn[2:]
             return getattr(rhs, fn)(lhs, _builder=self.builder)
         else:
@@ -312,9 +312,9 @@ class CodeGenerator(ast.NodeVisitor):
             ast.Gt: '__gt__',
             ast.GtE: '__ge__',
         }[type(node.ops[0])]
-        if self.is_triton_object(lhs):
+        if self.is_triton_block(lhs):
             return getattr(lhs, fn)(rhs, _builder=self.builder)
-        elif self.is_triton_object(rhs):
+        elif self.is_triton_block(rhs):
             fn = fn[:2] + 'r' + fn[2:]
             return getattr(rhs, fn)(lhs, _builder=self.builder)
         else:
@@ -332,7 +332,7 @@ class CodeGenerator(ast.NodeVisitor):
             ast.UAdd: '__pos__',
             ast.Invert: '__invert__',
         }[type(node.op)]
-        if self.is_triton_object(op):
+        if self.is_triton_block(op):
             return getattr(op, fn)(_builder=self.builder)
         return getattr(op, fn)()
 
@@ -362,7 +362,7 @@ class CodeGenerator(ast.NodeVisitor):
         assert node.ctx.__class__.__name__ == "Load"
         lhs = self.visit(node.value)
         slices = self.visit(node.slice)
-        if self.is_triton_object(lhs):
+        if self.is_triton_block(lhs):
             return lhs.__getitem__(slices, _builder=self.builder)
         return lhs[slices]
 
@@ -451,7 +451,7 @@ class CodeGenerator(ast.NodeVisitor):
         args = [self.visit(arg) for arg in node.args]
         if isinstance(fn, JITFunction):
             return fn(*args, generator=self, **kws)
-        if hasattr(fn, '__self__') and self.is_triton_object(fn.__self__) or \
+        if hasattr(fn, '__self__') and self.is_triton_block(fn.__self__) or \
                 sys.modules[fn.__module__] is triton.language.core:
             return fn(*args, _builder=self.builder, **kws)
         if fn in self.builtins.values():
