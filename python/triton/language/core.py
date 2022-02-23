@@ -1,10 +1,11 @@
 from functools import wraps
 
 import triton
-from triton._C.libtriton.triton import frontend, ir
+from triton._C.libtriton.triton import ast, frontend, ir
 
 
 # convert constant/block/dtype to ir value/type
+# FIXME: should not use ir::builder here.
 def _to_ir(x, builder):
     if isinstance(x, bool):
         return builder.get_int1(x)
@@ -26,7 +27,7 @@ def _to_ir(x, builder):
     elif isinstance(x, block):
         return x.ir_handle
     elif isinstance(x, dtype): # frontend type => ir type
-        return x.get_ir_type(builder)
+        return x.get_ast_type(builder)
     return x
 
 
@@ -39,6 +40,7 @@ def _patch(fn):
         return x
 
     def wrapper(*args, **kwargs):
+        ''' Convert args of tl.frontend.xxx() to ir values '''
         builder = args[-1]
         assert isinstance(builder, ir.builder)
         args = [_to_ir(x, builder) for x in args]
@@ -86,7 +88,8 @@ class dtype:
         assert nom.startswith(prefix)
         return nom[len(prefix):]
 
-    def get_ir_type(self, builder):
+    # FIXME: should not use builder here.
+    def get_ast_type(self, builder):
         ctx = builder.context
         return self.init(ctx)
 
@@ -108,28 +111,28 @@ class pointer_dtype:
             raise TypeError('element_ty is a {type(element_ty).__name__}.')
         self.element_ty = element_ty
 
-    def get_ir_type(self, builder):
-        return ir.type.make_ptr(self.element_ty.get_ir_type(builder), 1)
+    def get_ast_type(self, builder):
+        return ir.type.make_ptr(self.element_ty.get_ast_type(builder), 1)
 
     def __str__(self):
         return f'pointer<{self.element_ty}>'
 
 
 # scalar types
-int1 = dtype(ir.type.get_int1)
-int8 = dtype(ir.type.get_int8)
-int16 = dtype(ir.type.get_int16)
-int32 = dtype(ir.type.get_int32)
-int64 = dtype(ir.type.get_int64)
-uint8 = dtype(ir.type.get_uint8)
-uint16 = dtype(ir.type.get_uint16)
-uint32 = dtype(ir.type.get_uint32)
-uint64 = dtype(ir.type.get_uint64)
-float8 = dtype(ir.type.get_fp8)
-float16 = dtype(ir.type.get_fp16)
-bfloat16 = dtype(ir.type.get_bf16)
-float32 = dtype(ir.type.get_fp32)
-float64 = dtype(ir.type.get_fp64)
+int1 = dtype(ast.type.get_int1)
+int8 = dtype(ast.type.get_int8)
+int16 = dtype(ast.type.get_int16)
+int32 = dtype(ast.type.get_int32)
+int64 = dtype(ast.type.get_int64)
+uint8 = dtype(ast.type.get_uint8)
+uint16 = dtype(ast.type.get_uint16)
+uint32 = dtype(ast.type.get_uint32)
+uint64 = dtype(ast.type.get_uint64)
+float8 = dtype(ast.type.get_fp8)
+float16 = dtype(ast.type.get_fp16)
+bfloat16 = dtype(ast.type.get_bf16)
+float32 = dtype(ast.type.get_fp32)
+float64 = dtype(ast.type.get_fp64)
 # pointer types
 pi32_t = pointer_dtype(int32)
 
@@ -227,41 +230,41 @@ class block:
     Triton frontend representation for the ir value
     '''
     @staticmethod
-    def _init_dtype(ir_type):
+    def _init_dtype(ast_type):
         # primitive type
-        if ir_type.is_int1(): return int1
-        if ir_type.is_int8(): return int8
-        if ir_type.is_int16(): return int16
-        if ir_type.is_int32(): return int32
-        if ir_type.is_int64(): return int64
-        if ir_type.is_uint8(): return uint8
-        if ir_type.is_uint16(): return uint16
-        if ir_type.is_uint32(): return uint32
-        if ir_type.is_uint64(): return uint64
-        if ir_type.is_fp8(): return float8
-        if ir_type.is_fp16(): return float16
-        if ir_type.is_bf16(): return bfloat16
-        if ir_type.is_fp32(): return float32
-        if ir_type.is_fp64(): return float64
+        if ast_type.is_int1(): return int1
+        if ast_type.is_int8(): return int8
+        if ast_type.is_int16(): return int16
+        if ast_type.is_int32(): return int32
+        if ast_type.is_int64(): return int64
+        if ast_type.is_uint8(): return uint8
+        if ast_type.is_uint16(): return uint16
+        if ast_type.is_uint32(): return uint32
+        if ast_type.is_uint64(): return uint64
+        if ast_type.is_fp8(): return float8
+        if ast_type.is_fp16(): return float16
+        if ast_type.is_bf16(): return bfloat16
+        if ast_type.is_fp32(): return float32
+        if ast_type.is_fp64(): return float64
         # pointer type
-        if ir_type.is_ptr():
-            element_ty = block._init_dtype(ir_type.element)
+        if ast_type.is_ptr():
+            element_ty = block._init_dtype(ast_type.element)
             return pointer_dtype(element_ty)
-        raise ValueError(f"Unsupported type {ir_type}")
+        raise ValueError(f"Unsupported type {ast_type}")
 
-    def __init__(self, ir_handle) -> None:
-        ''' ir_handle: pointer to ir::value '''
-        self.ir_handle = ir_handle
+    def __init__(self, ast_handle) -> None:
+        ''' ast_handle: pointer to ast::value '''
+        self.ast_handle = ast_handle
         # Block shape
         self.shape = (1, )
-        if self.ir_handle.type.is_block():
-            self.shape = self.ir_handle.type.shape
+        if self.ast_handle.type.is_block():
+            self.shape = self.ast_handle.type.shape
         self.numel = 1
         for s in self.shape:
             self.numel *= s
         self.numel = constexpr(self.numel)
         # Data-type wrapper
-        self.dtype = block._init_dtype(self.ir_handle.type.scalar)
+        self.dtype = block._init_dtype(self.ast_handle.type.scalar)
         # Shape is a constexpr
         self.shape = [constexpr(s) for s in self.shape]
 
@@ -400,7 +403,7 @@ class block:
 
     @builtin
     def to(self, dtype, bitcast=False, _builder=None):
-        dtype = dtype.get_ir_type(_builder)
+        dtype = dtype.get_ast_type(_builder)
         if bitcast:
             return frontend.bitcast(self, dtype, _builder)
         return frontend.cast(self, dtype, _builder)

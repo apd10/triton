@@ -1,4 +1,6 @@
-﻿#include "triton/codegen/pass.h"
+﻿#include "pybind11/detail/common.h"
+#include "pybind11/pytypes.h"
+#include "triton/codegen/pass.h"
 #include "triton/codegen/target.h"
 #include "triton/driver/error.h"
 #include "triton/driver/llvm.h"
@@ -760,10 +762,58 @@ void init_triton_ir(py::module &&m) {
       .def("get_range", &ir::builder::get_range, ret::reference);
 }
 
+/*****************************************************************************/
+/* Python bindings for triton::ast                                           */
+/*****************************************************************************/
+void init_triton_ast(py::module &&m) {
+  using ret = py::return_value_policy;
+  using namespace pybind11::literals;
+
+  py::class_<ast::context>(m, "context")
+      .def(py::init<>());
+
+  py::class_<ast::type>(m, "type")
+      .def("get_fp8", &ast::type::get_fp8_ty, ret::reference)
+      .def("get_fp16", &ast::type::get_fp16_ty, ret::reference)
+      .def("get_bf16", &ast::type::get_bf16_ty, ret::reference)
+      .def("get_fp32", &ast::type::get_fp32_ty, ret::reference)
+      .def("get_fp64", &ast::type::get_fp64_ty, ret::reference)
+
+      .def("get_int1", &ast::type::get_int1_ty, ret::reference)
+      .def("get_int8", &ast::type::get_int8_ty, ret::reference)
+      .def("get_int16", &ast::type::get_int16_ty, ret::reference)
+      .def("get_int32", &ast::type::get_int32_ty, ret::reference)
+      .def("get_int64", &ast::type::get_int64_ty, ret::reference)
+
+      .def("get_uint8", &ast::type::get_uint8_ty, ret::reference)
+      .def("get_uint16", &ast::type::get_uint16_ty, ret::reference)
+      .def("get_uint32", &ast::type::get_uint32_ty, ret::reference)
+      .def("get_uint64", &ast::type::get_uint64_ty, ret::reference)
+
+      .def("is_void", &ast::type::is_void_ty, ret::reference)
+      .def("is_fp8", &ast::type::is_fp8_ty, ret::reference)
+      .def("is_fp16", &ast::type::is_fp16_ty, ret::reference)
+      .def("is_bf16", &ast::type::is_bf16_ty, ret::reference)
+      .def("is_fp32", &ast::type::is_fp32_ty, ret::reference)
+      .def("is_fp64", &ast::type::is_fp64_ty, ret::reference)
+
+      .def("is_int1", [](ast::type *self) { return is_signed_integer_ty(1); })
+      .def("is_int8", [](ast::type *self) { return is_signed_integer_ty(8); })
+      .def("is_int16", [](ast::type *self) { return is_signed_integer_ty(16); })
+      .def("is_int32", [](ast::type *self) { return is_signed_integer_ty(32); })
+      .def("is_int64", [](ast::type *self) { return is_signed_integer_ty(64); })
+
+      .def("is_uint8", [](ast::type *self) { return is_unsigned_integer_ty(8); })
+      .def("is_uint16", [](ast::type *self) { return is_unsigned_integer_ty(16); })
+      .def("is_uint32", [](ast::type *self) { return is_unsigned_integer_ty(32); })
+      .def("is_uint64", [](ast::type *self) { return is_unsigned_integer_ty(64); });
+}
+
 void init_triton(py::module &m) {
   py::module subm = m.def_submodule("triton");
   init_triton_codegen(std::move(subm.def_submodule("code_gen")));
   init_triton_runtime(std::move(subm.def_submodule("runtime")));
   init_triton_ir(std::move(subm.def_submodule("ir")));
   init_triton_frontend(std::move(subm.def_submodule("frontend")));
+  init_trtion_ast(std::move(subm.def_submodule("ast")));
 }

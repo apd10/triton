@@ -21,7 +21,7 @@ public:
   context& operator=(const context&) = delete;
 
 public:
-  ir::builder* builder = nullptr;
+  // ir::builder* builder = nullptr;
   std::shared_ptr<context_impl> p_impl;
 };
 

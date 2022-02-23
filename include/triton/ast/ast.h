@@ -1,17 +1,8 @@
-#ifndef _TRITON_FRONTEND_AST_H_
-#define _TRITON_FRONTEND_AST_H_
+#ifndef _TRITON_AST_AST_H_
+#define _TRITON_AST_AST_H_
 
 namespace triton {
 namespace ast {
-
-class context_impl {
-
-};
-
-class context {
-
-};
-
 
 class value {
   /// Generated ir value
