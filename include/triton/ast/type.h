@@ -12,10 +12,10 @@
 namespace triton {
 namespace ast {
 
-enum class signedness { SIGNED, UNSIGNED };
-
+// scalar type at the ast level
 class type {
 public:
+  enum class signedness { SIGNED, UNSIGNED };
   enum id_t : unsigned {
     VoidTyID = 0,
     // fp ty
@@ -36,8 +36,9 @@ public:
     // other
     FunctionTyID,
   };
-private:
+protected:
   id_t id_;
+  context &ctx; //< ast::context from where this type is generated
 
 public:
   bool is_signed_integer() const;
