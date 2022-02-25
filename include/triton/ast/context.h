@@ -30,7 +30,7 @@ public:
 
 // record ast::values
 public:
-  value *create_value(ir::value *, );
+  value *create_value(ir::value *, type *);
 private:
   std::vector<std::unique_ptr<ast::value>> ast_values_;
 };

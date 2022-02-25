@@ -604,7 +604,7 @@ class Kernel:
         raise NotImplementedError(f'could not compute type name for {obj}')
 
     @staticmethod
-    def _to_triton_ir(context, obj):
+    def _to_triton_ast_ty(context, obj):
         type_map = {
             'I': _triton.ast.type.get_int32,
             'L': _triton.ast.type.get_int64,
@@ -655,7 +655,7 @@ class Kernel:
         context = _triton.ir.context()
         # get just-in-time proto-type of kernel
         fn_args = [arg for i, arg in enumerate(wargs) if i not in constants]
-        arg_types = [Kernel._to_triton_ir(ast_context, arg) for arg in fn_args]
+        arg_types = [Kernel._to_triton_ast_ty(ast_context, arg) for arg in fn_args]
         ret_type = _triton.ir.type.get_void(ast_context)
         prototype = _triton.ir.type.make_function(ret_type, arg_types)
         # generate Triton-IR
