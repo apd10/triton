@@ -269,13 +269,13 @@ ast::value *dispatch::xor_(ast::value *input, ast::value *other, ast::context *c
 }
 
 
-ir::value *dispatch::lshr(ir::value *input, ir::value *other, ir::builder *builder) {
+ast::value *dispatch::lshr(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder) {
   ast::type *ret_ty = bitwise_op_type_checking(input, other, builder);
   return ctx->create_value(builder->create_lshr(input, other), ret_ty);
 }
 
 
-ir::value *dispatch::shl(ir::value *input, ir::value *other, ir::builder *builder) {
+ast::value *dispatch::shl(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder) {
   ast::type *ret_ty = bitwise_op_type_checking(input, other, builder);
   return ctx->create_value(builder->create_shl(input, other), ret_ty);
 }

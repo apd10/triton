@@ -74,15 +74,15 @@ struct dispatch{
 
   // memory operators
   static ast::value *load(ast::value* ptr, ast::value* mask, ast::value* other, const std::string &cache, int is_volatile, ast::context *ctx, ir::builder *builder);
-  static ir::value *store(ir::value* ptr, ir::value *value, ir::value *mask, ir::builder *builder);
-  static ir::value *atomic_cas(ir::value* ptr, ir::value *cmp, ir::value *val, ir::builder *builder);
-  static ir::value *atomic_add(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
-  static ir::value *atomic_max(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
-  static ir::value *atomic_min(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
-  static ir::value *atomic_and(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
-  static ir::value *atomic_or(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
-  static ir::value *atomic_xor(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
-  static ir::value *atomic_xchg(ir::value* ptr, ir::value *val, ir::value *msk, ir::builder *builder);
+  static ast::value *store(ast::value* ptr, ast::value *value, ast::value *mask, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_cas(ast::value* ptr, ast::value *cmp, ast::value *val, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_add(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_max(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_min(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_and(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_or(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_xor(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
+  static ast::value *atomic_xchg(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
 
   // linear algebra
   static ast::value *dot(ast::value *lhs, ast::value *rhs, ast::constant_int *allow_tf32, ast::context *ctx, ir::builder *builder);
@@ -108,6 +108,8 @@ struct dispatch{
   static ast::value *multiple_of(ast::value *x, int value, ast::context *ctx, ir::builder *builder);
   static ast::value *max_contiguous(ast::value *x, int value, ast::context *ctx, ir::builder *builder);
   static ast::value *debug_barrier(ast::context *ctx, ir::builder *builder);
+
+  // TODO: rules for ast::type => ir::type lowering
 };
 
 }
