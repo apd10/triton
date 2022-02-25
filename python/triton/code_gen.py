@@ -604,7 +604,7 @@ class Kernel:
         raise NotImplementedError(f'could not compute type name for {obj}')
 
     @staticmethod
-    def _to_triton_ast_ty(context, obj):
+    def _to_triton_ast_ty(context: _triton.ast.context, obj):
         type_map = {
             'I': _triton.ast.type.get_int32,
             'L': _triton.ast.type.get_int64,
