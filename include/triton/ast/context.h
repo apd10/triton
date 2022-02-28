@@ -1,32 +1,20 @@
 #ifndef _TRITON_AST_CONTEXT_H_
 #define _TRITON_AST_CONTEXT_H_
 
-#include 
 
 namespace triton {
 namespace ast {
 /// Holds long-lived ast nodes (such as types, constant values)
 class context {
 public:
-  context();
+  context(ir::context &ir_ctx) : ir_ctx_(ir_ctx) {}
   context(const context &) = delete;
   context& operator=(const context &) = delete;
 
+private:
+  ir::context &ir_ctx_; ///< Each ast context is associated with an ir context
 public:
-  type void_ty;
-  // floating point types
-  type fp8_ty, fp16_ty, bf16_ty, fp32_ty, fp64_ty;
-  // integer types
-  type int1_ty, int8_ty, int16_ty, int32_ty, int64_ty;
-  type uint8_ty, uint16_ty, uint32_ty, uint64_t;
-  // Pointer types
-  // TODO: need pointer types?
-  // Block types
-  // TODO: need block types?
-  
-  // constants
-  // std::map<std::pair<type*, uint64_t>, consta> int_constants_;
-  // std::map<std::pair<type*, 
+  ir::context *get_ir_context() { return &ir_ctx_; }
 
 // record ast::values
 public:

@@ -12,32 +12,16 @@
 namespace triton {
 namespace ast {
 
-// scalar type at the ast level
+class context;
+
+/// ast::type encapusulates ir::type and other type info (e.g., signedness)
 class type {
 public:
   enum class signedness { SIGNED, UNSIGNED };
-  enum id_t : unsigned {
-    VoidTyID = 0,
-    // fp ty
-    FP8TyID,
-    FP16TyID,
-    BF16TyID,
-    FP32TyID,
-    FP64TyID,
-    // int ty
-    INT8TyID,
-    INT16TyID,
-    INT32TyID,
-    INT64TyID,
-    UINT8TyID,
-    UINT16TyID,
-    UINT32TyID,
-    UINT64TyID,
-    // other
-    FunctionTyID,
-  };
-protected:
-  id_t id_;
+
+private:
+  ir::type *ir_ty_;
+  signedness signedness_ = signedness::SIGNED;
   context &ctx; //< ast::context from where this type is generated
 
 public:
@@ -46,26 +30,48 @@ public:
 
 public:
   // Factory methods
-  static type *get_void_ty();
-  static type *get_label_ty();
-  static type *get_fp8_ty();
-  static type *get_fp16_ty();
-  static type *get_bf16_ty();
-  static type *get_fp32_ty();
-  static type *get_fp64_ty();
+  static type *get_void_ty(context &ctx);
+  static type *get_label_ty(context &ctx);
+  static type *get_fp8_ty(context &ctx);
+  static type *get_fp16_ty(context &ctx);
+  static type *get_bf16_ty(context &ctx);
+  static type *get_fp32_ty(context &ctx);
+  static type *get_fp64_ty(context &ctx);
   // int
-  static type *get_int1_ty();
-  static type *get_int8_ty();
-  static type *get_int16_ty();
-  static type *get_int32_ty();
-  static type *get_int64_ty();
-  static type *get_int128_ty();
+  static type *get_int1_ty(context &ctx);
+  static type *get_int8_ty(context &ctx);
+  static type *get_int16_ty(context &ctx);
+  static type *get_int32_ty(context &ctx);
+  static type *get_int64_ty(context &ctx);
+  static type *get_int128_ty(context &ctx);
   // uint
-  static type *get_uint8_ty();
-  static type *get_uint16_ty();
-  static type *get_uint32_ty();
-  static type *get_uint64_ty();
-  static type *get_uint128_ty();
+  static type *get_uint8_ty(context &ctx);
+  static type *get_uint16_ty(context &ctx);
+  static type *get_uint32_ty(context &ctx);
+  static type *get_uint64_ty(context &ctx);
+  static type *get_uint128_ty(context &ctx);
+
+  // type attributes
+  unsigned get_fp_mantissa_width() const { return ir_ty_->get_fp_mantissa_width(); }
+  unsigned get_integer_bitwidth() const { return ir_ty_->get_integer_bitwidth(); }
+  // TODO: fill this
+
+  // primitive predicates
+  bool is_void_ty() const { return ir_ty_->is_void_ty(); }
+  bool is_fp8_ty() const  { return ir_ty_->is_fp8_ty(); }
+  bool is_fp16_ty() const { return ir_ty_->is_fp16_ty(); }
+  bool is_bf16_ty() const { return ir_ty_->is_bf16_ty(); }
+  bool is_fp32_ty() const { return ir_ty_->is_fp32_ty(); }
+  bool is_fp64_ty() const { return ir_ty_->is_fp64_ty(); }
+  bool is_label_ty() const { return ir_ty_->is_label_ty(); }
+  bool is_metadata_ty() const { return ir_ty_->is_metadata_ty(); }
+  bool is_token_ty() const { return ir_ty_->is_token_ty(); }
+  bool is_integer_ty() const { return ir_ty_->is_integer_ty(); }
+  bool is_integer_ty(unsigned bitwidth, signedness sn) {
+    return is_integer_ty() && get_integer_bitwidth() == bitwidth && signedness_ == sn;
+  }
+
+  // repr
 };
 
 } // namespace ast

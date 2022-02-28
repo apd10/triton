@@ -669,10 +669,6 @@ void init_triton_ir(py::module &&m) {
       .def("get_int16", &ir::type::get_int16_ty, ret::reference)
       .def("get_int32", &ir::type::get_int32_ty, ret::reference)
       .def("get_int64", &ir::type::get_int64_ty, ret::reference)
-      .def("get_uint8", &ir::type::get_uint8_ty, ret::reference)
-      .def("get_uint16", &ir::type::get_uint16_ty, ret::reference)
-      .def("get_uint32", &ir::type::get_uint32_ty, ret::reference)
-      .def("get_uint64", &ir::type::get_uint64_ty, ret::reference)
 
       .def("is_void", &ir::type::is_void_ty)
       .def("is_fp8", &ir::type::is_fp8_ty)
@@ -685,10 +681,6 @@ void init_triton_ir(py::module &&m) {
       .def("is_int16", [](ir::type *self) { return self->is_integer_ty(16, ir::signedness::SIGNED); })
       .def("is_int32", [](ir::type *self) { return self->is_integer_ty(32, ir::signedness::SIGNED); })
       .def("is_int64", [](ir::type *self) { return self->is_integer_ty(64, ir::signedness::SIGNED); })
-      .def("is_uint8", [](ir::type *self) { return self->is_integer_ty(8, ir::signedness::UNSIGNED); })
-      .def("is_uint16", [](ir::type *self) { return self->is_integer_ty(16, ir::signedness::UNSIGNED); })
-      .def("is_uint32", [](ir::type *self) { return self->is_integer_ty(32, ir::signedness::UNSIGNED); })
-      .def("is_uint64", [](ir::type *self) { return self->is_integer_ty(64, ir::signedness::UNSIGNED); })
 
       .def("repr", &ir::type::repr)
       .def_property_readonly("fp_mantissa_width", &ir::type::get_fp_mantissa_width)

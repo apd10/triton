@@ -88,7 +88,7 @@ class dtype:
         assert nom.startswith(prefix)
         return nom[len(prefix):]
 
-    # FIXME: should not use builder here.
+    # FIXME: should not use builder here. We need 
     def get_ast_type(self, builder):
         ctx = builder.context
         return self.init(ctx)

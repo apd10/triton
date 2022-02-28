@@ -35,13 +35,14 @@ class CodeGenerator(ast.NodeVisitor):
             ret = self.builtins[name]
         else:
             raise ValueError(f'{name} is not defined')
+        # TODO: why we need to create a new block?
         if isinstance(ret, triton.language.block):
             ir_handle = self.module.get_value(name)
             return triton.language.block(ir_handle)
         return ret
 
     def set_value(self, name, value):
-        if isinstance(value, _triton.ir.value):
+        if isinstance(value, _triton.ast.value):
             value = triton.language.block(value)
         if isinstance(value, triton.language.block):
             self.module.set_value(name, value.ir_handle)
@@ -630,7 +631,7 @@ class Kernel:
             name = Kernel._type_name(obj)
             elt_ty = type_map[name](context)
             return _triton.ast.type.make_ptr(elt_ty, 1)
-        # default path returns triton.ir.type directly
+        # default path returns triton.ast.type directly
         name = Kernel._type_name(obj)
         return type_map[name](context)
 
@@ -651,13 +652,13 @@ class Kernel:
 
     def _compile(self, *wargs, device, attributes, constants, num_warps, num_stages):
         # create IR module
-        ast_context = _triton.ast.context()
         context = _triton.ir.context()
+        ast_context = _triton.ast.context(context)
         # get just-in-time proto-type of kernel
         fn_args = [arg for i, arg in enumerate(wargs) if i not in constants]
         arg_types = [Kernel._to_triton_ast_ty(ast_context, arg) for arg in fn_args]
-        ret_type = _triton.ir.type.get_void(ast_context)
-        prototype = _triton.ir.type.make_function(ret_type, arg_types)
+        ret_type = _triton.ast.type.get_void(ast_context)
+        prototype = _triton.ast.type.make_function(ret_type, arg_types)
         # generate Triton-IR
         # export symbols visible from self.fn into code-generator object
         gscope = self.fn.__globals__
