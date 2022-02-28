@@ -35,10 +35,9 @@ class CodeGenerator(ast.NodeVisitor):
             ret = self.builtins[name]
         else:
             raise ValueError(f'{name} is not defined')
-        # TODO: why we need to create a new block?
-        if isinstance(ret, triton.language.block):
-            ir_handle = self.module.get_value(name)
-            return triton.language.block(ir_handle)
+        # if isinstance(ret, triton.language.block):
+        #     ir_handle = self.module.get_value(name)
+        #     return triton.language.block(ir_handle)
         return ret
 
     def set_value(self, name, value):

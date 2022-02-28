@@ -4,6 +4,7 @@
 #define _TRITON_IR_DISPATCH_H_
 
 #include "triton/ir/builder.h"
+#include "triton/ast/ast.h"
 #include <stdexcept>
 
 namespace triton{
@@ -33,11 +34,11 @@ struct dispatch{
   static ast::value *num_programs(int axis, ast::context *ctx, ir::builder *builder);
 
   // binary operators
-  static ast::value *add(ast::value *input, ast::value *other, ir::builder *builder);
-  static ast::value *sub(ast::value *input, ast::value *other, ir::builder *builder);
-  static ast::value *mul(ast::value *input, ast::value *other, ir::builder *builder);
-  static ast::value *truediv(ast::value *input, ast::value *other, ir::builder *builder);
-  static ast::value *floordiv(ast::value *input, ast::value *other, ir::builder *builder);
+  static ast::value *add(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
+  static ast::value *sub(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
+  static ast::value *mul(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
+  static ast::value *truediv(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
+  static ast::value *floordiv(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
   static ast::value *fdiv(ast::value *input, ast::value *other, ir::constant_int* ieee_rounding, ast::context *ctx, ir::builder *builder);
   static ast::value *mod(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
   static ast::value *and_(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder);
@@ -85,7 +86,7 @@ struct dispatch{
   static ast::value *atomic_xchg(ast::value* ptr, ast::value *val, ast::value *msk, ast::context *ctx, ir::builder *builder);
 
   // linear algebra
-  static ast::value *dot(ast::value *lhs, ast::value *rhs, ast::constant_int *allow_tf32, ast::context *ctx, ir::builder *builder);
+  static ast::value *dot(ast::value *lhs, ast::value *rhs, ir::constant_int *allow_tf32, ast::context *ctx, ir::builder *builder);
 
   // indexing
   static ast::value *where(ast::value* condition, ast::value *x, ast::value *y, ast::context *ctx, ir::builder *builder);

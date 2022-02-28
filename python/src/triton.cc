@@ -10,6 +10,7 @@
 #include "triton/ir/function.h"
 #include "triton/ir/module.h"
 #include "triton/ir/print.h"
+#include "triton/ast/ast.h"
 #include <optional>
 #include <pybind11/buffer_info.h>
 #include <pybind11/functional.h>
@@ -24,6 +25,7 @@
 #include "llvm/IR/Verifier.h"
 
 namespace py = pybind11;
+namespace ast = triton::ast;
 namespace ir = triton::ir;
 namespace drv = triton::driver;
 
@@ -578,8 +580,8 @@ void init_triton_frontend(py::module &&m) {
   // type manipuatation
   m.def("cat", &ir::dispatch::cat, ret::reference);
   m.def("reshape", &ir::dispatch::reshape, ret::reference);
-  typedef std::tuple<ir::value *, ir::value *> (*broadcast_ty)(ir::value *, ir::value *, ir::builder *);
-  typedef ir::value *(*broadcast_to_ty)(ir::value *, ir::type::block_shapes_t, ir::builder *);
+  typedef std::tuple<ast::value *, ast::value *> (*broadcast_ty)(ast::value *, ast::value *, ast::context*, ir::builder *);
+  typedef ast::value *(*broadcast_to_ty)(ast::value *, ir::type::block_shapes_t, ast::context*, ir::builder *);
   m.def("broadcast", (broadcast_ty)(&ir::dispatch::broadcast), ret::reference);
   m.def("broadcast_to", (broadcast_to_ty)(&ir::dispatch::broadcast), ret::reference);
   m.def("bitcast", &ir::dispatch::bitcast, ret::reference);
@@ -765,6 +767,10 @@ void init_triton_ast(py::module &&m) {
       .def(py::init<>());
 
   py::class_<ast::type>(m, "type")
+      .def("make_ptr", &ast::type::get_pointer_ty, ret::reference)
+      .def("make_function", &ast::type::get_function_ty, ret::reference)
+      .def("make_block", &ast::type::get_block_ty, ret::reference)
+
       .def("get_fp8", &ast::type::get_fp8_ty, ret::reference)
       .def("get_fp16", &ast::type::get_fp16_ty, ret::reference)
       .def("get_bf16", &ast::type::get_bf16_ty, ret::reference)
@@ -782,6 +788,11 @@ void init_triton_ast(py::module &&m) {
       .def("get_uint32", &ast::type::get_uint32_ty, ret::reference)
       .def("get_uint64", &ast::type::get_uint64_ty, ret::reference)
 
+      .def("is_ptr", &ast::type::is_pointer_ty)
+      .def("is_int", static_cast<bool (ast::type::*)() const>(&ast::type::is_integer_ty))
+      .def("is_floating", &ast::type::is_floating_point_ty)
+      .def("is_block", &ast::type::is_block_ty)
+
       .def("is_void", &ast::type::is_void_ty, ret::reference)
       .def("is_fp8", &ast::type::is_fp8_ty, ret::reference)
       .def("is_fp16", &ast::type::is_fp16_ty, ret::reference)
@@ -789,16 +800,21 @@ void init_triton_ast(py::module &&m) {
       .def("is_fp32", &ast::type::is_fp32_ty, ret::reference)
       .def("is_fp64", &ast::type::is_fp64_ty, ret::reference)
 
-      .def("is_int1", [](ast::type *self) { return is_signed_integer_ty(1); })
-      .def("is_int8", [](ast::type *self) { return is_signed_integer_ty(8); })
-      .def("is_int16", [](ast::type *self) { return is_signed_integer_ty(16); })
-      .def("is_int32", [](ast::type *self) { return is_signed_integer_ty(32); })
-      .def("is_int64", [](ast::type *self) { return is_signed_integer_ty(64); })
+      .def("is_int1", [](ast::type *self) { return self->is_integer_ty(1, ast::type::signedness::SIGNED); })
+      .def("is_int8", [](ast::type *self) { return self->is_integer_ty(8, ast::type::signedness::SIGNED); })
+      .def("is_int16", [](ast::type *self) { return self->is_integer_ty(16, ast::type::signedness::SIGNED); })
+      .def("is_int32", [](ast::type *self) { return self->is_integer_ty(32, ast::type::signedness::SIGNED); })
+      .def("is_int64", [](ast::type *self) { return self->is_integer_ty(64, ast::type::signedness::SIGNED); })
 
-      .def("is_uint8", [](ast::type *self) { return is_unsigned_integer_ty(8); })
-      .def("is_uint16", [](ast::type *self) { return is_unsigned_integer_ty(16); })
-      .def("is_uint32", [](ast::type *self) { return is_unsigned_integer_ty(32); })
-      .def("is_uint64", [](ast::type *self) { return is_unsigned_integer_ty(64); });
+      .def("is_uint8", [](ast::type *self) { return self->is_integer_ty(8, ast::type::signedness::UNSIGNED); })
+      .def("is_uint16", [](ast::type *self) { return self->is_integer_ty(16, ast::type::signedness::UNSIGNED); })
+      .def("is_uint32", [](ast::type *self) { return self->is_integer_ty(32, ast::type::signedness::UNSIGNED); })
+      .def("is_uint64", [](ast::type *self) { return self->is_integer_ty(64, ast::type::signedness::UNSIGNED); })
+
+      .def("repr", &ast::type::repr)
+      .def_property_readonly("fp_mantissa_width", &ast::type::get_fp_mantissa_width)
+      .def_property_readonly("scalar", &ast::type::get_scalar_ty)
+      .def_property_readonly("context", &ast::type::get_context, ret::reference);
 }
 
 void init_triton(py::module &m) {
@@ -807,5 +823,5 @@ void init_triton(py::module &m) {
   init_triton_runtime(std::move(subm.def_submodule("runtime")));
   init_triton_ir(std::move(subm.def_submodule("ir")));
   init_triton_frontend(std::move(subm.def_submodule("frontend")));
-  init_trtion_ast(std::move(subm.def_submodule("ast")));
+  init_triton_ast(std::move(subm.def_submodule("ast")));
 }

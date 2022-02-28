@@ -14,6 +14,9 @@ class value {
 
 public:
   value(ir::value *v, type *ast_ty) : ir_value_(v), type_(ast_ty) {}
+
+  ir::value *get_ir_value() const { return ir_value_; }
+  type *get_type() const { return type_; }
 };
 
 }
