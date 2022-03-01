@@ -26,9 +26,11 @@ private:
 public:
   ir::context *get_ir_context() { return &ir_ctx_; }
 
-// record ast::values
 public:
+  // If no ast::type provided, we will infer ast::type from ir::value
+  value *create_value(ir::value *);
   value *create_value(ir::value *, type *);
+  type *get_type_from_ir(ir::value *, type::signedness sn = type::signedness::SIGNED);
 private:
   std::vector<std::unique_ptr<ast::value>> ast_values_;
   std::map<std::pair<ir::type*, type::signedness>, std::unique_ptr<type>> ast_types_;
