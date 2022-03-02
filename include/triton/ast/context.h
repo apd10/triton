@@ -31,6 +31,7 @@ public:
   value *create_value(ir::value *);
   value *create_value(ir::value *, type *);
   type *get_type_from_ir(ir::value *, type::signedness sn = type::signedness::SIGNED);
+  type *get_type_from_ir_type(ir::type *, type::signedness sn = type::signedness::SIGNED);
 private:
   std::vector<std::unique_ptr<ast::value>> ast_values_;
   std::map<std::pair<ir::type*, type::signedness>, std::unique_ptr<type>> ast_types_;

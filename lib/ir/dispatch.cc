@@ -319,9 +319,9 @@ ast::value *dispatch::invert(ast::value *input, ast::context *ctx, ir::builder *
   ast::type* input_sca_ty = input->get_type()->get_scalar_ty();
   if(input_sca_ty->is_pointer_ty() || input_sca_ty->is_floating_point_ty())
     throw semantic_error("wrong type argument to unary invert (" + input_sca_ty->repr() + ")");
-  ir::value *_1 = ir::constant::get_all_ones_value(input_sca_ty->get_ir_type());
-  ir::value *ret = dispatch::xor_(input, _1, ctx, builder);
-  return ctx->create_value(ret, input->get_type());
+  ast::value *_1 = ctx->create_value(ir::constant::get_all_ones_value(input_sca_ty->get_ir_type()),
+                                     input_sca_ty);
+  return dispatch::xor_(input, _1, ctx, builder);
 }
 
 
@@ -519,26 +519,30 @@ std::tuple<ast::value*, ast::value*> dispatch::broadcast(ast::value *lhs, ast::v
 ast::value *dispatch::bitcast(ast::value *input, ast::type *dst_ty, ast::context *ctx, ir::builder *builder){
   ast::type *src_ty = input->get_type();
   if (src_ty->is_block_ty())
-    dst_ty = ir::block_type::get(dst_ty, input->get_type()->get_block_shapes());
+    dst_ty = ctx->get_type_from_ir_type(ir::block_type::get(dst_ty->get_ir_type(), 
+                                                       src_ty->get_block_shapes()),
+                                        src_ty->get_integer_signedness());
   if(src_ty == dst_ty)
     return input;
   ast::type *src_sca_ty = src_ty->get_scalar_ty();
   ast::type *dst_sca_ty = dst_ty->get_scalar_ty();
   if(src_sca_ty->is_pointer_ty() || dst_sca_ty->is_pointer_ty())
-    return ctx->create_value(cast(input, dst_ty, ctx, builder), dst_sca_ty);
+    return cast(input, dst_ty, ctx, builder);
   // Bitcast
   int src_bits = src_sca_ty->get_primitive_size_in_bits();
   int dst_bits = dst_sca_ty->get_primitive_size_in_bits();
   if(src_bits != dst_bits)
     throw std::runtime_error("Cannot bitcast data-type of size " + std::to_string(src_bits) +
                              "to data-type of size " + std::to_string(dst_bits));
-  return ctx->create_value(builder->create_cast(ir::BitCast, input->get_ir_value(), dst_ty), dst_ty);
+  return ctx->create_value(builder->create_cast(ir::BitCast, input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
 }
 
 ast::value *dispatch::cast(ast::value *input, ast::type *dst_ty, ast::context *ctx, ir::builder *builder) {
   ast::type *src_ty = input->get_type();
   if (src_ty->is_block_ty())
-    dst_ty = ast::block_type::get(dst_ty, input->get_type()->get_block_shapes());
+    dst_ty = ctx->get_type_from_ir_type(ir::block_type::get(dst_ty->get_ir_type(), 
+                                                    src_ty->get_block_shapes()),
+                                        src_ty->get_integer_signedness());
   if (src_ty == dst_ty)
     return input;
   ast::type *src_sca_ty = src_ty->get_scalar_ty();
@@ -548,57 +552,60 @@ ast::value *dispatch::cast(ast::value *input, ast::type *dst_ty, ast::context *c
                      dst_sca_ty->is_floating_point_ty() &&
                      src_sca_ty->get_fp_mantissa_width() > dst_sca_ty->get_fp_mantissa_width();
   if (truncate_fp)
-    return ctx->create_value(builder->create_fp_trunc(input->get_ir_value(), dst_ty), dst_ty);
+    return ctx->create_value(builder->create_fp_trunc(input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
   // FP Extension
   bool ext_fp = src_sca_ty->is_floating_point_ty() &&
                 dst_sca_ty->is_floating_point_ty() &&
                 src_sca_ty->get_fp_mantissa_width() < dst_sca_ty->get_fp_mantissa_width();
   if (ext_fp)
-    return ctx->create_value(builder->create_fp_ext(input->get_ir_value(), dst_ty), dst_ty);
+    return ctx->create_value(builder->create_fp_ext(input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
   // Int cast
   if (src_sca_ty->is_integer_ty() && dst_sca_ty->is_integer_ty() &&
       (src_sca_ty->get_integer_bitwidth() != dst_sca_ty->get_integer_bitwidth() ||
        src_sca_ty->get_integer_signedness() != dst_sca_ty->get_integer_signedness())) {
-    bool sign_extend = src_sca_ty->is_integer_signed() && src_sca_ty != builder->get_int1_ty();
-    return ctx->create_value(builder->create_int_cast(input->get_ir_value(), dst_ty, sign_extend), dst_ty);
+    bool sign_extend = src_sca_ty->is_integer_signed() && src_sca_ty->get_ir_type() != builder->get_int1_ty();
+    return ctx->create_value(builder->create_int_cast(input->get_ir_value(), dst_ty->get_ir_type(), sign_extend), dst_ty);
   }
   // Float -> Int
   if (src_sca_ty->is_floating_point_ty() && dst_sca_ty->is_integer_ty()){
     if(dst_sca_ty->is_bool_ty())
-      return ctx->create_value(builder->create_fp_to_ui(input->get_ir_value(), dst_ty), dst_ty);
+      return ctx->create_value(builder->create_fp_to_ui(input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
     else
-      return ctx->create_value(builder->create_fp_to_si(input->get_ir_value(), dst_ty), dst_ty);
+      return ctx->create_value(builder->create_fp_to_si(input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
   }
   // int -> Float
   if (src_sca_ty->is_integer_ty() && dst_sca_ty->is_floating_point_ty()){
     if (src_sca_ty->is_bool_ty() || !src_sca_ty->is_integer_signed())
-      return ctx->create_value(builder->create_ui_to_fp(input->get_ir_value(), dst_ty), dst_ty);
+      return ctx->create_value(builder->create_ui_to_fp(input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
     else
-      return ctx->create_value(builder->create_si_to_fp(input->get_ir_value(), dst_ty), dst_ty);
+      return ctx->create_value(builder->create_si_to_fp(input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
   }
+  // pointer -> int
   if (src_sca_ty->is_pointer_ty() && dst_sca_ty->is_integer_ty()){
     int bitwidth = dst_sca_ty->get_integer_bitwidth();
-    if(bitwidth == 64)
-      return ctx->create_value(builder->create_cast(ir::PtrToInt, input->get_ir_value(), dst_ty), dst_ty);
-    if(bitwidth == 1)
-      return dispatch::not_equal(dispatch::cast(input->get_ir_value(), builder->get_int64_ty(), builder),
-                                 builder->get_int64(0),
+    if (bitwidth == 64)
+      return ctx->create_value(builder->create_cast(ir::PtrToInt, input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
+    if (bitwidth == 1)
+      return dispatch::not_equal(dispatch::cast(input, 
+                                                ctx->get_type_from_ir_type(builder->get_int64_ty()), 
+                                                ctx, builder),
+                                 ctx->create_value(builder->get_int64(0)),
                                  ctx,
                                  builder);
   }
   if (!src_sca_ty->is_pointer_ty() && dst_sca_ty->is_pointer_ty())
-    return ctx->create_value(builder->create_cast(ir::IntToPtr, input->get_ir_value(), dst_ty), /*ty*/);
+    return ctx->create_value(builder->create_cast(ir::IntToPtr, input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
   // Ptr -> Ptr
   if (src_sca_ty->is_pointer_ty() && dst_sca_ty->is_pointer_ty())
-    return ctx->create_value(builder->create_cast(ir::BitCast, input->get_ir_value(), dst_ty), /*ty*/);
+    return ctx->create_value(builder->create_cast(ir::BitCast, input->get_ir_value(), dst_ty->get_ir_type()), dst_ty);
   // * -> Bool
   if (dst_sca_ty->is_bool_ty()) {
     if (src_sca_ty->is_pointer_ty())
-      input = cast(input->get_ir_value(), builder->get_int64_ty(), ctx, builder);
+      input = cast(input, ctx->get_type_from_ir_type(builder->get_int64_ty()), ctx, builder);
     ast::value *other = ctx->create_value(builder->get_int64(0), ast::type::get_int64_ty(*ctx));
     if (src_ty->is_bool_ty())
-      other = ctx->create_value(builder->create_splat(other->get_ir_value(), src_ty->get_block_shapes()), /*ty*/);
-    return ctx->create_value(builder->create_icmpNE(input->get_ir_value(), other->get_ir_value()), /*ty*/);
+      other = ctx->create_value(builder->create_splat(other->get_ir_value(), src_ty->get_block_shapes()), dst_ty);
+    return ctx->create_value(builder->create_icmpNE(input->get_ir_value(), other->get_ir_value()), dst_ty);
   }
   throw_unreachable("casting from " + src_sca_ty->repr() + " to " + dst_sca_ty->repr());
 }
@@ -623,9 +630,9 @@ ast::value *dispatch::load(ast::value* ptr, ast::value* mask, ast::value* other,
   ast::type *ptr_ty = ptr->get_type()->get_scalar_ty();
   ast::type *elt_ty = ptr_ty->get_pointer_element_ty();
   // treat bool* as int8*
-  if(elt_ty == builder->get_int1_ty()){
-    elt_ty = builder->get_int8_ty();
-    ptr_ty = pointer_type::get(elt_ty, ptr_ty->get_pointer_address_space());
+  if (elt_ty == ast::type::get_int1_ty(*ctx)) {
+    elt_ty = ast::type::get_int8_ty(*ctx);
+    ptr_ty = ctx->get_type_from_ir_type(pointer_type::get(elt_ty->get_ir_type(), ptr_ty->get_pointer_address_space()));
     ptr = dispatch::cast(ptr, ptr_ty, ctx, builder);
   }
   // cache modifier
@@ -639,62 +646,68 @@ ast::value *dispatch::load(ast::value* ptr, ast::value* mask, ast::value* other,
       throw std::runtime_error(std::string("Cache modifier ") + cache_modifier + " not supported");
   }
   if (!mask && !other)
-    return ctx->create_value(builder->create_load(ptr, cache, is_volatile), /*ty*/);
+    return ctx->create_value(builder->create_load(ptr->get_ir_value(), cache, is_volatile), elt_ty);
   if (!mask)
     throw std::runtime_error("`other` cannot be provided without `mask`");
   auto shape = ptr->get_type()->get_block_shapes();
   if(!other){
-    other = ir::undef_value::get(elt_ty);
+    // FIXME: signedness info
+    other = ctx->create_value(ir::undef_value::get(elt_ty->get_ir_type()));
     if(ptr->get_type()->is_block_ty())
-      other = builder->create_splat(other, ptr->get_type()->get_block_shapes());
+      other = ctx->create_value(builder->create_splat(other->get_ir_value(), ptr->get_type()->get_block_shapes()));
   }
-  return builder->create_masked_load(ptr, mask, other, cache, is_volatile);
+  return ctx->create_value(builder->create_masked_load(ptr->get_ir_value(), mask->get_ir_value(), other->get_ir_value(), cache, is_volatile),
+                           elt_ty);
 }
 
 ast::value *dispatch::store(ast::value* ptr, ast::value *val, ast::value* mask, ast::context *ctx, ir::builder *builder) {
   if(!ptr->get_type()->get_scalar_ty()->is_pointer_ty())
     throw semantic_error("Pointer argument of store instruction is " + ptr->get_type()->repr());
   if(ptr->get_type()->is_block_ty())
-    val = dispatch::broadcast(val, ptr->get_type()->get_block_shapes(), builder);
+    val = dispatch::broadcast(val, ptr->get_type()->get_block_shapes(), ctx, builder);
   if(mask)
-    mask = dispatch::broadcast(mask, ptr->get_type()->get_block_shapes(), builder);
+    mask = dispatch::broadcast(mask, ptr->get_type()->get_block_shapes(), ctx, builder);
   ast::type *ptr_ty = ptr->get_type()->get_scalar_ty();
   ast::type *elt_ty = ptr_ty->get_pointer_element_ty();
   // treat bool* as int8*
-  if(elt_ty == builder->get_int1_ty()){
-    elt_ty = builder->get_int8_ty();
-    ptr_ty = pointer_type::get(elt_ty, ptr_ty->get_pointer_address_space());
-    ptr = dispatch::cast(ptr, ptr_ty, builder);
+  if (elt_ty == ast::type::get_int1_ty(*ctx)) {
+    elt_ty = ast::type::get_int8_ty(*ctx);
+    ptr_ty = ctx->get_type_from_ir_type(pointer_type::get(elt_ty->get_ir_type(), ptr_ty->get_pointer_address_space()));
+    ptr = dispatch::cast(ptr, ptr_ty, ctx, builder);
   }
   // cast to target data-type
-  val = dispatch::cast(val, elt_ty, builder);
+  val = dispatch::cast(val, elt_ty, ctx, builder);
   if (!mask)
-    return builder->create_store(ptr, val);
+    return ctx->create_value(builder->create_store(ptr->get_ir_value(), val->get_ir_value()));
   if(!mask->get_type()->get_scalar_ty()->is_bool_ty())
     throw semantic_error("Mask must have boolean scalar type");
-  return builder->create_masked_store(ptr, val, mask);
+  return ctx->create_value(builder->create_masked_store(ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()));
 }
 
 ast::value *dispatch::atomic_cas(ast::value* ptr, ast::value *cmp, ast::value *val, ast::context *ctx, ir::builder *builder){
-  return builder->create_atomic_cas(ptr->get_ir_value(), cmp->get_ir_value(), val->get_ir_value());
+  return ctx->create_value(
+    builder->create_atomic_cas(ptr->get_ir_value(), cmp->get_ir_value(), val->get_ir_value()),
+    val->get_type()
+  );
 }
 
-static void atom_red_typechecking(ast::value*& ptr, ast::value *&val, ast::value *&mask, ir::builder *builder){
+static void atom_red_typechecking(ast::value*& ptr, ast::value *&val, ast::value *&mask, ast::context *ctx, ir::builder *builder){
   if(!ptr->get_type()->get_scalar_ty()->is_pointer_ty())
     throw semantic_error("Pointer argument of store instruction is " + ptr->get_type()->repr());
   if(ptr->get_type()->is_block_ty()){
     if(mask){
-      mask = dispatch::broadcast(mask, ptr->get_type()->get_block_shapes(), builder);
+      mask = dispatch::broadcast(mask, ptr->get_type()->get_block_shapes(), ctx, builder);
     }
     if(val){
-      val = dispatch::broadcast(val, ptr->get_type()->get_block_shapes(), builder);
+      val = dispatch::broadcast(val, ptr->get_type()->get_block_shapes(), ctx, builder);
     }
   }
   val = dispatch::cast(val, ptr->get_type()->get_scalar_ty()->get_pointer_element_ty(), ctx, builder);
   if(!mask){
-    mask = builder->get_int1(true);
+    mask = ctx->create_value(builder->get_int1(true));
     if(ptr->get_type()->is_block_ty())
-      mask = builder->create_splat(mask, ptr->get_type()->get_block_shapes());
+      mask = ctx->create_value(builder->create_splat(mask->get_ir_value(), ptr->get_type()->get_block_shapes()),
+                               val->get_type());
   }
 }
 
@@ -722,7 +735,7 @@ ast::value *dispatch::atomic_max(ast::value* ptr, ast::value *val, ast::value *m
 }
 
 ast::value *dispatch::atomic_min(ast::value* ptr, ast::value *val, ast::value *mask, ast::context *ctx, ir::builder *builder){
-  atom_red_typechecking(ptr, val, mask, builder);
+  atom_red_typechecking(ptr, val, mask, ctx, builder);
   ir::type* sca_ty = val->get_type()->get_scalar_ty();
   // direct call to atomic_min for integers
   if(sca_ty->is_integer_ty()) {
@@ -745,36 +758,36 @@ ast::value *dispatch::atomic_min(ast::value* ptr, ast::value *val, ast::value *m
 }
 
 ast::value *dispatch::atomic_add(ast::value* ptr, ast::value *val, ast::value *mask, ast::context *ctx, ir::builder *builder){
-  atom_red_typechecking(ptr, val, mask, builder);
+  atom_red_typechecking(ptr, val, mask, ctx, builder);
   ast::type* sca_ty = val->get_type()->get_scalar_ty();
   auto op = sca_ty->is_floating_point_ty() ? ir::atomic_rmw_op_t::FAdd : ir::atomic_rmw_op_t::Add;
   return ctx->create_value(builder->create_atomic_rmw(op, 
-          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), /*ty*/);
+          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), val->get_type());
 }
 
 ast::value *dispatch::atomic_and(ast::value* ptr, ast::value *val, ast::value *mask, ast::context *ctx, ir::builder *builder){
-  atom_red_typechecking(ptr, val, mask, builder);
+  atom_red_typechecking(ptr, val, mask, ctx, builder);
   return ctx->create_value(builder->create_atomic_rmw(ir::atomic_rmw_op_t::And, 
-          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), /*ty*/);
+          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), val->get_type());
 }
 
 ast::value *dispatch::atomic_or(ast::value* ptr, ast::value *val, ast::value *mask, ast::context *ctx, ir::builder *builder){
-  atom_red_typechecking(ptr, val, mask, builder);
+  atom_red_typechecking(ptr, val, mask, ctx, builder);
   return ctx->create_value(builder->create_atomic_rmw(ir::atomic_rmw_op_t::Or, 
-          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), /*ty*/);
+          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), val->get_type());
 }
 
 ast::value *dispatch::atomic_xor(ast::value* ptr, ast::value *val, ast::value *mask, ast::context *ctx, ir::builder *builder){
-  atom_red_typechecking(ptr, val, mask, builder);
+  atom_red_typechecking(ptr, val, mask, ctx, builder);
   return ctx->create_value(builder->create_atomic_rmw(ir::atomic_rmw_op_t::Xor, 
-          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), /*ty*/);
+          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), val->get_type());
 }
 
 ast::value *dispatch::atomic_xchg(ast::value* ptr, ast::value *val, ast::value *mask, ast::context *ctx, ir::builder *builder){
-  atom_red_typechecking(ptr, val, mask, builder);
+  atom_red_typechecking(ptr, val, mask, ctx, builder);
   ast::type* sca_ty = val->get_type()->get_scalar_ty();
   return ctx->create_value(builder->create_atomic_rmw(ir::atomic_rmw_op_t::Xchg, 
-          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), /*ty*/);
+          ptr->get_ir_value(), val->get_ir_value(), mask->get_ir_value()), val->get_type());
 }
 
 //===----------------------------------------------------------------------===//
@@ -791,7 +804,7 @@ ast::value *dispatch::dot(ast::value *lhs, ast::value *rhs, ir::constant_int *al
   unsigned N = rhs->get_type()->get_block_shapes()[1];
   _0 = builder->create_splat(_0, {M, N});
   bool _allow_tf32 = allow_tf32->get_value() != 0;
-  ir::value *ret = builder->create_dot(lhs, rhs, _0, _allow_tf32);
+  ir::value *ret = builder->create_dot(lhs->get_ir_value(), rhs->get_ir_value(), _0, _allow_tf32);
   return ctx->create_value(ret);
 }
 
@@ -834,7 +847,7 @@ static ast::value *reduce_impl(ast::value *input, unsigned int axis, ast::contex
     ast::type *ret_ty = ctx->get_type_from_ir(ret, input->get_type()->get_integer_signedness());
     return ctx->create_value(ret, ret_ty);
   } else if (scalar_ty->is_integer_ty()) {
-    ir::value *ret = builder->create_reduce(input->get_ir_value(), INT_OP, axis)
+    ir::value *ret = builder->create_reduce(input->get_ir_value(), INT_OP, axis);
     ast::type *ret_ty = ctx->get_type_from_ir(ret, input->get_type()->get_integer_signedness());
     return ctx->create_value(ret, ret_ty);
   }

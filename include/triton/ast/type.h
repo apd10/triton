@@ -71,7 +71,12 @@ public:
   const size_t get_tile_rank() const { return ir_ty_->get_tile_rank(); }
   const size_t get_tile_ranks1() const { return ir_ty_->get_tile_ranks1(); }
   unsigned get_tile_num_elements() const { return ir_ty_->get_tile_num_elements(); }
-  // TODO: fill this
+  unsigned get_pointer_address_space() const { return ir_ty_->get_pointer_address_space(); }
+  // TODO: we need to store signedness info of pointee type
+  type *get_pointer_element_ty() const;
+  // {
+  //   return ctx->get_type_from_ir_type(ir_ty_->get_pointer_element_ty());
+  // }
 
   // primitive predicates
   bool is_void_ty() const { return ir_ty_->is_void_ty(); }
