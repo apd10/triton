@@ -136,7 +136,7 @@ ast::value *dispatch::add(ast::value *input, ast::value *other, ast::context *ct
   // int + int
   else if (input_scalar_ty->is_integer_ty()) {
     ir::value *ret = builder->create_add(input->get_ir_value(), other->get_ir_value());
-    return ctx->create_value(ret), ret_ty);
+    return ctx->create_value(ret, ret_ty);
   }
   throw_unreachable("add");
 }
@@ -280,19 +280,22 @@ ast::value *dispatch::or_(ast::value *input, ast::value *other, ast::context *ct
 
 
 ast::value *dispatch::xor_(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder) {
-  ast::type *ret_ty = bitwise_op_type_checking(input, other, ctx, builder);
+  bitwise_op_type_checking(input, other, ctx, builder);
+  ast::type *ret_ty = input->get_type();
   return ctx->create_value(builder->create_xor(input->get_ir_value(), other->get_ir_value()), ret_ty);
 }
 
 
 ast::value *dispatch::lshr(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder) {
-  ast::type *ret_ty = bitwise_op_type_checking(input, other, ctx, builder);
+  bitwise_op_type_checking(input, other, ctx, builder);
+  ast::type *ret_ty = input->get_type();
   return ctx->create_value(builder->create_lshr(input->get_ir_value(), other->get_ir_value()), ret_ty);
 }
 
 
 ast::value *dispatch::shl(ast::value *input, ast::value *other, ast::context *ctx, ir::builder *builder) {
-  ast::type *ret_ty = bitwise_op_type_checking(input, other, ctx, builder);
+  bitwise_op_type_checking(input, other, ctx, builder);
+  ast::type *ret_ty = input->get_type();
   return ctx->create_value(builder->create_shl(input->get_ir_value(), other->get_ir_value()), ret_ty);
 }
 
@@ -316,8 +319,9 @@ ast::value *dispatch::invert(ast::value *input, ast::context *ctx, ir::builder *
   ast::type* input_sca_ty = input->get_type()->get_scalar_ty();
   if(input_sca_ty->is_pointer_ty() || input_sca_ty->is_floating_point_ty())
     throw semantic_error("wrong type argument to unary invert (" + input_sca_ty->repr() + ")");
-  ast::value *_1 = ctx->create_value(ir::constant::get_all_ones_value(input_sca_ty), input_sca_ty);
-  return ctx->create_value(dispatch::xor_(input, _1, ctx, builder), input_sca_ty);
+  ir::value *_1 = ir::constant::get_all_ones_value(input_sca_ty->get_ir_type());
+  ir::value *ret = dispatch::xor_(input, _1, ctx, builder);
+  return ctx->create_value(ret, input->get_type());
 }
 
 
