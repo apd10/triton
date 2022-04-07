@@ -1,5 +1,4 @@
 # flake8: noqa: F821,F841
-import copy
 import itertools
 import re
 from typing import Optional, Union
@@ -12,7 +11,7 @@ from numpy.random import RandomState
 import triton
 import triton._C.libtriton.triton as _triton
 import triton.language as tl
-from triton.code_gen import TensorWrapper, reinterpret
+from triton.code_gen import JITFunction, TensorWrapper, reinterpret
 
 int_dtypes = ['int8', 'int16', 'int32', 'int64']
 uint_dtypes = ['uint8', 'uint16', 'uint32', 'uint64']
@@ -585,7 +584,6 @@ def test_f8_f16_roundtrip():
 
     f8_output_tensor = torch.empty_like(f16, dtype=torch.int8)
     f8_output = triton.reinterpret(f8_output_tensor, tl.float8)
-    print(f16.dtype, f8_output.dtype)
     copy_kernel[grid](f16, f8_output, n_elements, BLOCK_SIZE=1024)
 
     assert torch.all(f8_tensor == f8_output_tensor)
@@ -994,11 +992,17 @@ def test_noop(device='cuda'):
 
 
 @pytest.mark.parametrize("value, value_type", [
-    (-1, 'i32'), (0, 'i32'), (1, None), (-2**31, 'i32'), (2**31 - 1, 'i32'),
+    (-1, 'i32'), (0, 'i32'), (-2**31, 'i32'), (2**31 - 1, 'i32'),
     (2**31, 'u32'), (2**32 - 1, 'u32'), (2**32, 'i64'), (2**63 - 1, 'i64'),
     (-2**63, 'i64'), (2**63, 'u64'), (2**64 - 1, 'u64')
 ])
 def test_value_specialization(value: int, value_type: str, device='cuda') -> None:
+    spec_type = None
+
+    def cache_hook(*args, **kwargs):
+        nonlocal spec_type
+        spec_type = kwargs["compile"]["arg_types"][0][1]
+    JITFunction.cache_hook = cache_hook
 
     @triton.jit
     def kernel(VALUE, X):
@@ -1007,11 +1011,8 @@ def test_value_specialization(value: int, value_type: str, device='cuda') -> Non
     x = torch.tensor([3.14159], device='cuda')
     pgm = kernel[(1, )](value, x)
 
-    # Parse out the type of the 'VALUE' parameter from the Triton IR.
-    triton_ir = pgm.asm['ttir']
-    ir_value_match = re.match(r'\s*def void kernel\((\w+) VALUE ', triton_ir)
-    ir_value_type = None if ir_value_match is None else ir_value_match.group(1)
-    assert ir_value_type == value_type
+    JITFunction.cache_hook = None
+    assert spec_type == value_type
 
 
 @pytest.mark.parametrize(
@@ -1031,3 +1032,28 @@ def test_value_specialization_overflow(value: int, overflow: bool, device='cuda'
             kernel[(1, )](value, x)
     else:
         kernel[(1, )](value, x)
+# -------------------------
+# test dynamic parallelism
+# -------------------------
+
+
+@triton.jit
+def mult(x, alpha):
+    tl.store(x + tl.program_id(0), alpha)
+
+
+@triton.jit
+def stub(X, alpha, grid_0, grid_1, grid_2):
+    tl.launch(mult, [X, alpha], [grid_0, grid_1, grid_2])
+
+
+# def test_dyn_par(cond=True, device='cuda'):
+#     n_pids = 10
+#     # pids = torch.arange(n_pids, device=device)
+#     # alpha = 2.0
+#     # x_ref = pids * alpha
+#     x_tri = torch.full((10,), fill_value=-1., device=device)
+#     # cond = torch.tensor([cond], device=device)
+#     stub[(1,)](x_tri, 3.14, n_pids, 1, 1)
+#     print(x_tri)
+#     # triton.testing.assert_almost_equal(x_ref, x_tri)
